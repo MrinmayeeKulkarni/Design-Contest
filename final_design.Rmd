@@ -1,0 +1,235 @@
+---
+title: "Annual State Park Visits"
+output: 
+  flexdashboard::flex_dashboard:
+    storyboard: true
+    social: menu
+    source: embed
+---
+
+```{r setup, include=FALSE}
+
+library(flexdashboard)
+library(reshape2)
+library(plotly)
+library(raster)
+library(sf) 
+library(viridis)
+library(tidyverse)
+
+#read data
+states_shp <- st_read("./Data/tl_2017_us_state.shp")
+```
+
+-----------------------------------------------------------------------
+
+### Tidy Tuesday Replication
+National Park Visits
+The total number of visitors since 1904 till 2016\n(for the TOP 5 states with the highest number of parks\' guests
+
+```{r National Parks Tidy Tuesday}
+park_visits <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-09-17/national_parks.csv")
+
+park_visits_sub <- park_visits %>% 
+  dplyr::select(year, region, state, unit_code, unit_name, unit_type, visitors) %>% 
+  drop_na() %>% #drop rows with NA
+  filter(year != "Total") %>%
+  mutate(year = as.integer(year)) %>%
+  arrange(year) %>%
+  group_by(year, state) %>%
+  summarise(visitors_total = sum(visitors))
+  
+# 5 states with the highest number of total visitors
+top = 5
+state_max <- aggregate(visitors_total ~ state, data = park_visits_sub, FUN = sum) %>% arrange(desc(visitors_total)) %>% head(n=top)
+
+## TODO - create a function
+
+state_1 <- park_visits_sub %>% filter(state == state_max$state[1]) %>% rename(!!paste(state_max$state[1], 'total_visitors', sep = '_') := visitors_total)
+state_2 <- park_visits_sub %>% filter(state == state_max$state[2]) %>% rename(!!paste(state_max$state[2], 'total_visitors', sep = '_') := visitors_total)
+state_3 <- park_visits_sub %>% filter(state == state_max$state[3]) %>% rename(!!paste(state_max$state[3], 'total_visitors', sep = '_') := visitors_total)
+state_4 <- park_visits_sub %>% filter(state == state_max$state[4]) %>% rename(!!paste(state_max$state[4], 'total_visitors', sep = '_') := visitors_total)
+state_5 <- park_visits_sub %>% filter(state == state_max$state[5]) %>% rename(!!paste(state_max$state[5], 'total_visitors', sep = '_') := visitors_total)
+  
+state_max_df <- state_1 %>%
+  left_join(state_2, by = 'year') %>% 
+  left_join(state_3, by = 'year') %>%
+  left_join(state_4, by = 'year') %>%
+  left_join(state_5, by = 'year') %>%
+  select(-c('state.x','state.y', 'state.x.x', 'state.y.y', 'state'))
+
+# Data reorganization for the line plot
+state_max_dfmelt <- melt(state_max_df, id = "year")
+ 
+
+## Plot
+  
+# Caption text
+caption_text = expression(paste("Data source: ", bold("Data.world"), " | Graphic: ", bold("Justyna Pawlata")))
+  
+# Fonts
+font_family = 'Verdana'
+text_color = '#595959'
+
+# Remove scientific notation on axis y
+options(scipen=5)
+multipl = 1000000 # 1 mln
+  
+plot <- ggplot(state_max_dfmelt, aes(x = year, y = value/multipl, group = variable, colour = variable)) + 
+  geom_line() + 
+  theme_minimal() + 
+  theme(
+    plot.title = element_text(hjust = 0,
+                              face = 'bold', 
+                              size = 20, 
+                              family = font_family, 
+                              color = text_color),
+    plot.subtitle = element_text(hjust = 0, 
+                                 family = font_family, 
+                                 color = text_color),
+    plot.caption = element_text(hjust = 1, 
+                                family = font_family, 
+                                color = text_color),
+    axis.title.y = element_text(family = font_family, 
+                                color = text_color),
+    axis.text.x = element_text(family = font_family),
+    
+    # Legend
+    legend.title = element_text(hjust = 0.5, 
+                                family = font_family, 
+                                color = text_color),
+    legend.text = element_text(color = text_color,
+                               family = font_family),
+    legend.justification=c(0,0),
+    legend.position=c(0.1,0.695),
+    legend.box.margin = margin(0.2, 0.5, 0.2, 0.2, "cm"),
+    legend.key.width = unit(2,"cm"),
+    legend.background = element_rect(fill = 'white', colour = 'transparent')
+  ) +
+  labs(
+    
+    caption = caption_text,
+    x = element_blank(),
+    y = expression(paste('Total number of visitors (', 10^{6}, ')'))
+  ) + 
+  #scale_color_discrete(name = 'States:', labels = c('CA', 'NC', 'DC', 'VA', 'NY'))
+  scale_color_discrete(name = 'States:', labels = c('California', 'North Carolina', 'District of Columbia', 'Virginia', 'New York'))
+  
+  plot
+```
+
+-----------------------------------------------------------------------
+
+### Tidy Tuesday Replication And Critique
+source:Justyna Pawlata:https://github.com/jpawlata/TidyTuesday/tree/master/2019/2019-09-17
+
+```{r,Replication and Critique}
+park_visits <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-09-17/national_parks.csv")
+park_visits_sub <- park_visits %>% 
+  dplyr::select(year, region, state, unit_code, unit_name, unit_type, visitors) %>% 
+  drop_na() %>% #drop rows with NA
+  filter(year != "Total") %>%
+  filter(year>=1925)%>%
+  mutate(year = as.integer(year)) %>%
+  arrange(year) %>%
+  group_by(year, state) %>%
+  summarise(visitors_total = sum(visitors))
+
+top = 5
+state_max <- aggregate(visitors_total ~ state, data = park_visits_sub, FUN = sum) %>% arrange(desc(visitors_total)) %>% head(n=top)
+
+state_1 <- park_visits_sub %>% filter(state == state_max$state[1]) %>% rename(!!paste(state_max$state[1], 'total_visitors', sep = '_') := visitors_total)
+state_2 <- park_visits_sub %>% filter(state == state_max$state[2]) %>% rename(!!paste(state_max$state[2], 'total_visitors', sep = '_') := visitors_total)
+state_3 <- park_visits_sub %>% filter(state == state_max$state[3]) %>% rename(!!paste(state_max$state[3], 'total_visitors', sep = '_') := visitors_total)
+state_4 <- park_visits_sub %>% filter(state == state_max$state[4]) %>% rename(!!paste(state_max$state[4], 'total_visitors', sep = '_') := visitors_total)
+state_5 <- park_visits_sub %>% filter(state == state_max$state[5]) %>% rename(!!paste(state_max$state[5], 'total_visitors', sep = '_') := visitors_total)
+
+state_max_df <- state_1 %>%
+  left_join(state_2, by = 'year') %>% 
+  left_join(state_3, by = 'year') %>%
+  left_join(state_4, by = 'year') %>%
+  left_join(state_5, by = 'year') %>%
+  select(-c('state.x','state.y', 'state.x.x', 'state.y.y', 'state'))
+
+state_max_df<-plyr::rename(state_max_df, c("CA_total_visitors"="California","NC_total_visitors"="North Carolina","DC_total_visitors"="District of Columbia","VA_total_visitors"="Virginia","NY_total_visitors"="New York"))
+
+state_max_dfmelt <- melt(state_max_df, id = "year")
+
+caption_text = expression(paste(" source: ", bold("Justyna Pawlata:https://github.com/jpawlata/TidyTuesday/tree/master/2019/2019-09-17")))
+
+options(scipen=5)
+multipl = 1000000 # 1 mln
+
+font_family = 'Verdana'
+text_color = '#595959'
+plots<-ggplot(state_max_dfmelt, aes(x = year, y = value/multipl, group = variable, colour = variable)) + 
+  geom_smooth() + geom_point(alpha=0.2)+ 
+  theme(
+    plot.title = element_text(hjust = 0,
+                              face = 'bold', 
+                              size = 20, 
+                              family = font_family, 
+                              color = text_color),
+    plot.subtitle = element_text(hjust = 0, 
+                                 family = font_family, 
+                                 color = text_color),
+    plot.caption = element_text(hjust = 1, 
+                                family = font_family, 
+                                color = text_color),
+    axis.title.y = element_text(family = font_family, 
+                                color = text_color),
+    axis.text.x = element_text(family = font_family),
+    
+    # Legend
+    legend.title = element_text(hjust = 0.5, 
+                                family = font_family, 
+                                color = text_color),
+    legend.text = element_text(color = text_color,
+                               family = font_family),
+    legend.justification=c(0,0),
+    legend.position=c(0.1,0.695),
+    legend.box.margin = margin(0.2, 0.5, 0.2, 0.2, "cm"),
+    legend.key.width = unit(2,"cm"),
+    legend.background = element_rect(fill = 'white', colour = 'transparent')
+  )+
+  labs(
+    x = ('Years'),
+    y = ('Total Number Of Visitors')
+ )  + scale_color_manual(name = 'States:',values=c("#E69F00","#56B4E9","#009E73","#CC79A7","#D55E00"))
+
+
+ggplotly(plots,tooltip=c("x","y","group")) # convert ggplot object to plotly
+
+```
+
+###  Heatmap
+
+```{r,Heatmap}
+
+park_visits <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-09-17/national_parks.csv")
+#add character copy of state abbv
+states_shp <- states_shp %>% 
+  mutate(state = as.character(STUSPS))
+
+park_visits <- park_visits %>%
+  dplyr::select(year,state_park = unit_name,region,state,visitors) %>%
+  filter(year != 'Total')
+
+park_visits1982 <- park_visits %>%
+  filter(year == '1982')
+
+#merge on common variable called key
+m <- inner_join(park_visits, states_shp,by = 'state')
+
+m1982 <- inner_join(park_visits1982, states_shp,by = 'state') %>%
+  group_by(state)
+#choropleth
+ggplot(data = m1982) +
+  geom_sf(aes(geometry = geometry, fill = visitors)) +
+  ggtitle("State Parks 1982") +
+  theme_bw() +
+    theme()+
+      coord_sf(xlim = c(-130, -60), ylim = c(22, 52), expand = FALSE)
+
+```
+
